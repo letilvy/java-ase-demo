@@ -2,6 +2,10 @@ package com.sap.ase;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -15,7 +19,7 @@ public class LeaderboardTest {
 	
 	@Before
 	public void setup() {
-		lb = new Leaderboard();
+		lb = new Leaderboard(mock(SocialMedia.class), mock(Logger.class));
 		peter = new Player(0, "Peter");
 		cindy = new Player(1, "Cindy");
 		dave = new Player(2, "Dave");
@@ -75,5 +79,19 @@ public class LeaderboardTest {
 		lb.update(peter, 1000);
 		lb.update(cindy, 1000);
 		assertThat(lb.getPositionOfPlayer(dave), is(3));
+	}
+	
+	@Test
+	public void socialMediaUpdateFails_shouldLog() {
+		Logger logger = mock(Logger.class);
+		
+		SocialMedia socialMedia = mock(SocialMedia.class);
+		RuntimeException error = new RuntimeException("connection refused");
+		when(socialMedia.post(anyInt())).thenThrow(error);
+		
+		lb = new Leaderboard(socialMedia, logger);
+		lb.update(peter, 1000);
+		
+		verify(logger).log(error);
 	}
 }
