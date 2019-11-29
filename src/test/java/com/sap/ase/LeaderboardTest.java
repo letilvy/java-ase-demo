@@ -1,14 +1,30 @@
 package com.sap.ase;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+// Mockito home page: https://site.mockito.org/
+/**
+ * import mockito as static then you can call method of Mockito directly without prefix "Mockito".
+ * Or if you import using "import org.mockito.Mockito;", you have to call method like "Mockito.mock", "Mockito.spy"
+*/
+import static org.mockito.Mockito.*;  //"import static org.mockito.Mockito.*;" is different from "import static org.mockito.Mockito;" 
 
-import javax.ws.rs.core.Response;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.*;
 
 import org.junit.Before;
 import org.junit.Test;
 
 public class LeaderboardTest {
+	/*
+	 * Solution 1: Directly override the method needed to be stub
+	 *
+		public class LeaderboardForTest extends Leaderboard {
+			@Override
+			public boolean publishHighScoreOfPlayer(Player player, int potSize){
+				return true;
+			}
+		}
+		private lb = new LeaderboardForTest();
+	*/
 
 	private Leaderboard lb;
 	private Player peter;
@@ -16,8 +32,52 @@ public class LeaderboardTest {
 	private Player dave;
 	
 	@Before
-	public void setup() {
-		lb = new Leaderboard(new DummySocialMedia(), new DummyLogger());
+	public void setup(){
+		//lb = new Leaderboard();
+		/**
+		 * Solution 2: Use Mockito to mock
+		 
+			lb = spy(Leaderboard.class);
+			doReturn(true).when(lb).publishHighScoreOfPlayer(any(Player.class), anyInt()); // Only mock a special method of a class
+
+			 *
+			 * The following way will mock the whole class, all methods in the class will be mocked
+				lb = mock(Leaderboard.class);
+				when(lb.publishHighScoreOfPlayer(any(Player.class), anyInt())).thenReturn(true);
+
+			 * when you call lb.update after the above two statements, you just call an empty method  
+			 *
+		*/
+
+		/**
+		 * 
+		 * Solution 3: Law of demeter
+
+		   Both Solution 1 and Solution 2 exposed the implement detail of class 'Leaderboard', 
+		   you should know there is a method call 'publishHighScoreOfPlayer' within the class.
+		   Solution 3 is to create a new class to handle operation of method 'publishHighScoreOfPlayer'.
+		   The operation in 'publishHighScoreOfPlayer' is all about interacting with social media channel,
+		   So we can create a new class "SocialMedia" with method "postMessageToFacebook",
+		   and mock this class. 
+
+		   Best practice for test stub:
+		     Inheritance like solution 1 may still have many dependency on the parent class.
+		     So create a new class to move out not-relevant logic and use an instance of this new class
+		     in the tested class is better option. 
+		 * 
+		*/
+		//mock(SocialMedia.class).when((any(Player.class), anyInt())).thenReturn(true);
+		SocialMedia socialMedia = new SocialMedia();
+		socialMedia = mock(SocialMedia.class);
+		when(socialMedia.postMessageToFacebook(any(Player.class), anyInt())).thenReturn(true);
+
+		lb = new Leaderboard(socialMedia);
+
+		/**
+		 * Solution 4: Make "SocialMedia" as an interface but a class
+	
+		*/
+
 		peter = new Player(0, "Peter");
 		cindy = new Player(1, "Cindy");
 		dave = new Player(2, "Dave");
@@ -77,42 +137,5 @@ public class LeaderboardTest {
 		lb.update(peter, 1000);
 		lb.update(cindy, 1000);
 		assertThat(lb.getPositionOfPlayer(dave), is(3));
-	}
-	
-	@Test
-	public void socialMediaUpdateFails_shouldLog() {
-		SpyLogger spyLogger = new SpyLogger();
-		lb = new Leaderboard(new FailingSocialMedia(), spyLogger);
-		lb.update(peter, 1000);
-		assertThat(spyLogger.loggedException.getMessage(), is("connection refused"));
-	}
-	
-	private class DummySocialMedia implements SocialMedia {
-		@Override
-		public Response post(int potSize) {
-			return null;
-		}
-	}
-	
-	private class FailingSocialMedia implements SocialMedia {
-		@Override
-		public Response post(int potSize) {
-			throw new RuntimeException("connection refused");
-		}
-	}
-	
-	private class DummyLogger implements Logger {
-		@Override
-		public void log(RuntimeException e) {
-		}
-	}
-	
-	private class SpyLogger implements Logger {
-		private RuntimeException loggedException;
-		
-		@Override
-		public void log(RuntimeException e) {
-			loggedException = e;
-		}
 	}
 }
